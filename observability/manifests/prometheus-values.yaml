@@ -1,0 +1,67 @@
+# Prometheus Stack Values
+grafana:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30000
+  adminPassword: admin123
+  persistence:
+    enabled: true
+    size: 10Gi
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      istio-service-dashboard:
+        gnetId: 7639
+        revision: 1
+        datasource: Prometheus
+      istio-workload-dashboard:
+        gnetId: 7630
+        revision: 1
+        datasource: Prometheus
+
+prometheus:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30090
+  prometheusSpec:
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+alertmanager:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30093
+
+kubeStateMetrics:
+  enabled: true
+
+nodeExporter:
+  enabled: true
+
+kubelet:
+  enabled: true

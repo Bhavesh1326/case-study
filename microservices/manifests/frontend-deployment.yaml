@@ -1,0 +1,174 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: microservices
+  labels:
+    app: frontend
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: v1
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: frontend-nginx-config
+      - name: html-content
+        configMap:
+          name: frontend-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: microservices
+  labels:
+    app: frontend
+    version: v1
+spec:
+  selector:
+    app: frontend
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  namespace: microservices
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+        
+        location /api/ {
+            proxy_pass http://backend:8080/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-html
+  namespace: microservices
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Microservices Demo</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #333; text-align: center; }
+            .service { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+            .status { padding: 5px 10px; border-radius: 3px; color: white; }
+            .healthy { background: #28a745; }
+            .unhealthy { background: #dc3545; }
+            button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+            button:hover { background: #0056b3; }
+            #response { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Microservices Platform Demo</h1>
+            <p>Welcome to our Kubernetes platform with GitOps, Istio, and Observability!</p>
+            
+            <div class="service">
+                <h3>Frontend Service</h3>
+                <span class="status healthy">Healthy</span>
+                <p>This is the frontend service running on Kubernetes with Istio sidecar injection.</p>
+            </div>
+            
+            <div class="service">
+                <h3>Backend API</h3>
+                <span class="status" id="backend-status">Checking...</span>
+                <p>Backend service status will be checked via API call.</p>
+                <button onclick="checkBackend()">Check Backend Status</button>
+                <div id="response"></div>
+            </div>
+            
+            <div class="service">
+                <h3>Platform Components</h3>
+                <ul>
+                    <li>✅ Kubernetes Cluster</li>
+                    <li>✅ Istio Service Mesh</li>
+                    <li>✅ Argo CD (GitOps)</li>
+                    <li>✅ Prometheus & Grafana</li>
+                    <li>✅ Jaeger Tracing</li>
+                    <li>✅ Security Tools</li>
+                </ul>
+            </div>
+        </div>
+        
+        <script>
+            async function checkBackend() {
+                const statusEl = document.getElementById('backend-status');
+                const responseEl = document.getElementById('response');
+                
+                try {
+                    statusEl.textContent = 'Checking...';
+                    statusEl.className = 'status';
+                    
+                    const response = await fetch('/api/health');
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        statusEl.textContent = 'Healthy';
+                        statusEl.className = 'status healthy';
+                        responseEl.innerHTML = `<strong>Response:</strong> ${JSON.stringify(data, null, 2)}`;
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                } catch (error) {
+                    statusEl.textContent = 'Unhealthy';
+                    statusEl.className = 'status unhealthy';
+                    responseEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                }
+            }
+            
+            // Check backend status on page load
+            checkBackend();
+        </script>
+    </body>
+    </html>

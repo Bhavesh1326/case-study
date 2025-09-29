@@ -1,0 +1,95 @@
+# Falco Configuration
+falco:
+  rules_file:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/k8s_audit_rules.yaml
+    - /etc/falco/rules.d
+
+  json_output: true
+  json_include_output_property: true
+  http_output:
+    enabled: true
+    url: "http://prometheus-pushgateway.observability.svc.cluster.local:9091/metrics/job/falco"
+  grpc:
+    enabled: true
+    bind_address: "0.0.0.0:5060"
+  webserver:
+    enabled: true
+    listen_port: 8765
+    k8s_audit_endpoint: /k8s-audit
+    k8s_audit_webhook: /k8s-audit
+    ssl_enabled: false
+
+  # Security rules
+  security:
+    enabled: true
+    rules:
+      - rule: "Write below binary dir"
+        desc: "Detect writes to binary directories"
+        condition: "bin_dir and open_write"
+        output: "File below a binary directory opened for writing (user=%user.name command=%proc.cmdline file=%fd.name)"
+        priority: "ERROR"
+        tags: [filesystem, mitre_persistence]
+
+      - rule: "Read sensitive file untrusted"
+        desc: "The reading of sensitive files (e.g. files containing user/password/authentication information)"
+        condition: "sensitive_files and open_read"
+        output: "Sensitive file opened for reading (user=%user.name command=%proc.cmdline file=%fd.name)"
+        priority: "WARNING"
+        tags: [filesystem, mitre_credential_access]
+
+      - rule: "Launch Suspicious Network Tool in Container"
+        desc: "Detect network tools launched in container"
+        condition: "spawned_process and container and proc.name in (netcat, nc, wget, curl)"
+        output: "Network tool launched in container (user=%user.name command=%proc.cmdline container=%container.name)"
+        priority: "WARNING"
+        tags: [container, network, mitre_discovery]
+
+  # Kubernetes audit rules
+  k8s_audit_rules:
+    - rule: "K8s Secret Accessed"
+      desc: "Detect access to Kubernetes secrets"
+      condition: "k8s_audit and ka.verb in (get, list, watch) and ka.target.resource=secrets"
+      output: "K8s Secret accessed (user=%ka.user.name verb=%ka.verb resource=%ka.target.resource name=%ka.target.name)"
+      priority: "WARNING"
+      tags: [k8s, mitre_credential_access]
+
+    - rule: "K8s Pod Created"
+      desc: "Detect pod creation"
+      condition: "k8s_audit and ka.verb=create and ka.target.resource=pods"
+      output: "K8s Pod created (user=%ka.user.name pod=%ka.target.name namespace=%ka.target.namespace)"
+      priority: "INFO"
+      tags: [k8s, mitre_execution]
+
+  # Container runtime rules
+  container_rules:
+    - rule: "Container Drift Detected"
+      desc: "Container image different from expected"
+      condition: "container and container.image.repository != expected_repo"
+      output: "Container drift detected (container=%container.name image=%container.image.repository)"
+      priority: "WARNING"
+      tags: [container, mitre_persistence]
+
+# Resource limits
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8765
+
+# RBAC
+rbac:
+  create: true
+
+# Service account
+serviceAccount:
+  create: true
+  name: falco

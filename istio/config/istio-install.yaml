@@ -1,0 +1,50 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: control-plane
+  namespace: istio-system
+spec:
+  profile: demo
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 500m
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        service:
+          type: NodePort
+          ports:
+          - port: 80
+            targetPort: 8080
+            name: http2
+            nodePort: 30080
+          - port: 443
+            targetPort: 8443
+            name: https
+            nodePort: 30443
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+  values:
+    global:
+      proxy:
+        resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+          limits:
+            memory: 256Mi
+            cpu: 200m
+    pilot:
+      autoscaleEnabled: false
+    gateways:
+      istio-ingressgateway:
+        autoscaleEnabled: false

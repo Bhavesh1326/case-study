@@ -1,0 +1,35 @@
+# Jaeger Values
+service:
+  type: NodePort
+  nodePort: 30686
+
+storage:
+  type: memory
+  options:
+    memory:
+      max-traces: 50000
+
+query:
+  service:
+    type: NodePort
+    nodePort: 30686
+
+collector:
+  service:
+    type: ClusterIP
+
+agent:
+  service:
+    type: ClusterIP
+
+allInOne:
+  enabled: true
+  image:
+    tag: "1.50"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
